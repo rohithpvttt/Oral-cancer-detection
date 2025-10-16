@@ -1,0 +1,85 @@
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Step 1: Set up dataset directories
+train_dir = 'dataset/train'     # two subfolders: normal/, cancer/
+test_dir = 'dataset/test'
+
+# Step 2: Data Preprocessing and Augmentation
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=25,
+    zoom_range=0.2,
+    horizontal_flip=True,
+    shear_range=0.2,
+    validation_split=0.2
+)
+
+train_data = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='binary',
+    subset='training'
+)
+
+val_data = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='binary',
+    subset='validation'
+)
+
+# Step 3: Build CNN Model
+model = Sequential([
+    Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
+    MaxPooling2D(2, 2),
+    Conv2D(64, (3, 3), activation='relu'),
+    MaxPooling2D(2, 2),
+    Flatten(),
+    Dense(128, activation='relu'),
+    Dropout(0.5),
+    Dense(1, activation='sigmoid')
+])
+
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+# Step 4: Train the Model
+history = model.fit(
+    train_data,
+    validation_data=val_data,
+    epochs=15
+)
+
+# Step 5: Evaluate on Test Data
+test_datagen = ImageDataGenerator(rescale=1./255)
+test_data = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(128, 128),
+    batch_size=32,
+    class_mode='binary',
+    shuffle=False
+)
+
+predictions = model.predict(test_data)
+y_pred = (predictions > 0.5).astype(int)
+print(classification_report(test_data.classes, y_pred))
+
+# Step 6: Plot Accuracy and Loss
+plt.plot(history.history['accuracy'], label='Train Acc')
+plt.plot(history.history['val_accuracy'], label='Val Acc')
+plt.legend()
+plt.show()
+
+# Step 7: Save the Model
+model.save('oral_cancer_model.h5')
+print("✅ Model saved as oral_cancer_model.h5")
